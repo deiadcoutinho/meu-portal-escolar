@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Settings,
   GraduationCap,
   UserPlus,
-  BookOpen
+  BookOpen,
+  CheckCircle
 } from 'lucide-react';
 import { MOCK_STUDENTS } from './mockData';
 import { Subject, Student } from './types';
@@ -15,13 +15,29 @@ type AssignedSubject = {
   link: string;
 };
 
+type Exercise = {
+  id: string;
+  title: string;
+  points: number;
+  done: boolean;
+};
+
 const App: React.FC = () => {
-  const [students, setStudents] = useState<(Student & { assignedSubjects?: AssignedSubject[] })[]>(() => {
+  const [students, setStudents] = useState<(Student & {
+    assignedSubjects?: AssignedSubject[];
+    exercises?: { [key: string]: Exercise[] };
+  })[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : MOCK_STUDENTS.map(s => ({ ...s, assignedSubjects: [] }));
+    return saved
+      ? JSON.parse(saved)
+      : MOCK_STUDENTS.map(s => ({
+          ...s,
+          assignedSubjects: [],
+          exercises: {}
+        }));
   });
 
-  const [user, setUser] = useState<(Student & { assignedSubjects?: AssignedSubject[] }) | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ name: '', pass: '' });
@@ -32,6 +48,9 @@ const App: React.FC = () => {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<Subject>(Subject.MATEMATICA);
   const [subjectLink, setSubjectLink] = useState('');
+
+  const [exerciseTitle, setExerciseTitle] = useState('');
+  const [exercisePoints, setExercisePoints] = useState(10);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
@@ -64,17 +83,19 @@ const App: React.FC = () => {
   const handleAddStudent = () => {
     if (!newStudent.name || !newStudent.password) return;
 
-    const aluno: Student & { assignedSubjects: AssignedSubject[] } = {
-      id: crypto.randomUUID(),
-      name: newStudent.name,
-      password: newStudent.password,
-      xp: 0,
-      avatar: `https://api.dicebear.com/7.x/thumbs/svg?seed=${newStudent.name}`,
-      exercises: {},
-      assignedSubjects: []
-    };
+    setStudents(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name: newStudent.name,
+        password: newStudent.password,
+        xp: 0,
+        avatar: '',
+        exercises: {},
+        assignedSubjects: []
+      }
+    ]);
 
-    setStudents(prev => [...prev, aluno]);
     setNewStudent({ name: '', password: '' });
   };
 
@@ -87,70 +108,106 @@ const App: React.FC = () => {
 
         const exists = s.assignedSubjects?.find(a => a.subject === selectedSubject);
 
-        if (exists) {
-          return {
-            ...s,
-            assignedSubjects: s.assignedSubjects!.map(a =>
-              a.subject === selectedSubject ? { ...a, link: subjectLink } : a
-            )
-          };
-        }
-
         return {
           ...s,
-          assignedSubjects: [...(s.assignedSubjects || []), { subject: selectedSubject, link: subjectLink }]
+          assignedSubjects: exists
+            ? s.assignedSubjects!.map(a =>
+                a.subject === selectedSubject ? { ...a, link: subjectLink } : a
+              )
+            : [...(s.assignedSubjects || []), { subject: selectedSubject, link: subjectLink }]
         };
       })
     );
 
     setSubjectLink('');
-    alert('Matéria atribuída!');
   };
 
-  /* =========================
+  const addExercise = () => {
+    if (!selectedStudentId || !exerciseTitle) return;
+
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== selectedStudentId) return s;
+
+        const list = s.exercises?.[selectedSubject] || [];
+
+        return {
+          ...s,
+          exercises: {
+            ...s.exercises,
+            [selectedSubject]: [
+              ...list,
+              {
+                id: crypto.randomUUID(),
+                title: exerciseTitle,
+                points: exercisePoints,
+                done: false
+              }
+            ]
+          }
+        };
+      })
+    );
+
+    setExerciseTitle('');
+  };
+
+  const completeExercise = (subject: string, exerciseId: string) => {
+    setStudents(prev =>
+      prev.map(s => {
+        if (s.id !== user.id) return s;
+
+        return {
+          ...s,
+          xp: s.xp + 10,
+          exercises: {
+            ...s.exercises,
+            [subject]: s.exercises![subject].map(ex =>
+              ex.id === exerciseId ? { ...ex, done: true } : ex
+            )
+          }
+        };
+      })
+    );
+  };
+
+  /* =======================
      TELA DO ALUNO
-  ========================== */
+  ======================= */
   if (user && !isAdmin) {
     return (
       <div className="min-h-screen bg-slate-50 p-10">
-        <h1 className="text-4xl font-black mb-8">
-          Olá, {user.name} 👋
+        <h1 className="text-3xl font-black mb-6">
+          {user.name} — XP: {user.xp}
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {user.assignedSubjects?.length === 0 && (
-            <p className="text-slate-500">
-              Nenhuma matéria atribuída ainda.
-            </p>
-          )}
+        {user.assignedSubjects?.map((sub: any) => (
+          <div key={sub.subject} className="bg-white p-6 rounded-3xl border mb-6">
+            <h2 className="text-xl font-black mb-4">{sub.subject}</h2>
 
-          {user.assignedSubjects?.map((item, index) => (
-            <div
-              key={index}
-              className="bg-white border rounded-3xl p-6 flex flex-col justify-between"
-            >
-              <h2 className="text-xl font-black mb-4">
-                {item.subject}
-              </h2>
+            {(user.exercises?.[sub.subject] || []).map((ex: Exercise) => (
+              <div key={ex.id} className="flex justify-between items-center mb-2">
+                <span>{ex.title} ({ex.points} pts)</span>
 
-              <a
-                href={item.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-indigo-600 text-white text-center py-3 rounded-xl font-black"
-              >
-                Acessar
-              </a>
-            </div>
-          ))}
-        </div>
+                {!ex.done && (
+                  <button
+                    onClick={() => completeExercise(sub.subject, ex.id)}
+                    className="text-green-600 font-bold flex gap-1"
+                  >
+                    <CheckCircle size={18} /> Concluir
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     );
   }
 
-  /* =========================
-     TELA DE LOGIN
-  ========================== */
+  /* =======================
+     LOGIN
+  ======================= */
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -178,83 +235,76 @@ const App: React.FC = () => {
     );
   }
 
-  /* =========================
+  /* =======================
      PAINEL DO PROFESSOR
-  ========================== */
+  ======================= */
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <aside className="w-72 bg-white border-r p-6">
-        <h2 className="font-black text-xl flex items-center gap-2">
-          <GraduationCap /> Professor
-        </h2>
-      </aside>
+    <div className="min-h-screen bg-slate-50 p-10 space-y-10">
+      <h1 className="text-4xl font-black">Painel do Professor</h1>
 
-      <main className="flex-1 p-10 space-y-10">
-        <h1 className="text-4xl font-black">Painel do Professor</h1>
+      <div className="bg-white p-6 rounded-3xl border max-w-xl">
+        <h3 className="font-black mb-2">Novo Aluno</h3>
+        <input
+          placeholder="Nome"
+          value={newStudent.name}
+          onChange={e => setNewStudent({ ...newStudent, name: e.target.value })}
+          className="border p-2 rounded-xl w-full mb-2"
+        />
+        <input
+          placeholder="Senha"
+          value={newStudent.password}
+          onChange={e => setNewStudent({ ...newStudent, password: e.target.value })}
+          className="border p-2 rounded-xl w-full mb-2"
+        />
+        <button onClick={handleAddStudent} className="bg-indigo-600 text-white py-2 rounded-xl w-full">
+          Cadastrar
+        </button>
+      </div>
 
-        <div className="bg-white p-8 rounded-3xl border space-y-4 max-w-xl">
-          <h3 className="font-black flex items-center gap-2">
-            <UserPlus /> Novo Aluno
-          </h3>
-          <input
-            placeholder="Nome"
-            value={newStudent.name}
-            onChange={e => setNewStudent({ ...newStudent, name: e.target.value })}
-            className="border p-3 rounded-xl w-full"
-          />
-          <input
-            placeholder="Senha"
-            value={newStudent.password}
-            onChange={e => setNewStudent({ ...newStudent, password: e.target.value })}
-            className="border p-3 rounded-xl w-full"
-          />
-          <button onClick={handleAddStudent} className="bg-indigo-600 text-white py-3 rounded-xl font-black w-full">
-            Cadastrar
-          </button>
-        </div>
+      <div className="bg-white p-6 rounded-3xl border max-w-xl space-y-3">
+        <h3 className="font-black">Adicionar Exercício</h3>
 
-        <div className="bg-white p-8 rounded-3xl border space-y-4 max-w-xl">
-          <h3 className="font-black flex items-center gap-2">
-            <BookOpen /> Atribuir Matéria
-          </h3>
+        <select
+          value={selectedStudentId}
+          onChange={e => setSelectedStudentId(e.target.value)}
+          className="border p-2 rounded-xl w-full"
+        >
+          <option value="">Aluno</option>
+          {students.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
 
-          <select
-            value={selectedStudentId}
-            onChange={e => setSelectedStudentId(e.target.value)}
-            className="border p-3 rounded-xl w-full"
-          >
-            <option value="">Selecione o aluno</option>
-            {students.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+        <select
+          value={selectedSubject}
+          onChange={e => setSelectedSubject(e.target.value as Subject)}
+          className="border p-2 rounded-xl w-full"
+        >
+          {Object.values(Subject).map(sub => (
+            <option key={sub} value={sub}>{sub}</option>
+          ))}
+        </select>
 
-          <select
-            value={selectedSubject}
-            onChange={e => setSelectedSubject(e.target.value as Subject)}
-            className="border p-3 rounded-xl w-full"
-          >
-            {Object.values(Subject).map(sub => (
-              <option key={sub} value={sub}>{sub}</option>
-            ))}
-          </select>
+        <input
+          placeholder="Título do exercício"
+          value={exerciseTitle}
+          onChange={e => setExerciseTitle(e.target.value)}
+          className="border p-2 rounded-xl w-full"
+        />
 
-          <input
-            placeholder="Link da matéria / jogo"
-            value={subjectLink}
-            onChange={e => setSubjectLink(e.target.value)}
-            className="border p-3 rounded-xl w-full"
-          />
+        <input
+          type="number"
+          value={exercisePoints}
+          onChange={e => setExercisePoints(Number(e.target.value))}
+          className="border p-2 rounded-xl w-full"
+        />
 
-          <button onClick={assignSubject} className="bg-slate-900 text-white py-3 rounded-xl font-black w-full">
-            Atribuir
-          </button>
-        </div>
-      </main>
+        <button onClick={addExercise} className="bg-slate-900 text-white py-2 rounded-xl w-full">
+          Adicionar
+        </button>
+      </div>
     </div>
   );
 };
 
 export default App;
- 
- 
