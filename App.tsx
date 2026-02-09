@@ -21,9 +21,8 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : MOCK_STUDENTS.map(s => ({ ...s, assignedSubjects: [] }));
   });
 
-  const [user, setUser] = useState<Student | null>(null);
+  const [user, setUser] = useState<(Student & { assignedSubjects?: AssignedSubject[] }) | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'admin'>('admin');
 
   const [loginForm, setLoginForm] = useState({ name: '', pass: '' });
   const [error, setError] = useState('');
@@ -43,10 +42,23 @@ const App: React.FC = () => {
 
     if (loginForm.name === 'admin' && loginForm.pass === 'admin') {
       setIsAdmin(true);
+      setUser(null);
+      setError('');
       return;
     }
 
-    setError('Acesso negado');
+    const aluno = students.find(
+      s => s.name === loginForm.name && s.password === loginForm.pass
+    );
+
+    if (aluno) {
+      setUser(JSON.parse(JSON.stringify(aluno)));
+      setIsAdmin(false);
+      setError('');
+      return;
+    }
+
+    setError('Usuário ou senha inválidos');
   };
 
   const handleAddStudent = () => {
@@ -95,6 +107,50 @@ const App: React.FC = () => {
     alert('Matéria atribuída!');
   };
 
+  /* =========================
+     TELA DO ALUNO
+  ========================== */
+  if (user && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-10">
+        <h1 className="text-4xl font-black mb-8">
+          Olá, {user.name} 👋
+        </h1>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {user.assignedSubjects?.length === 0 && (
+            <p className="text-slate-500">
+              Nenhuma matéria atribuída ainda.
+            </p>
+          )}
+
+          {user.assignedSubjects?.map((item, index) => (
+            <div
+              key={index}
+              className="bg-white border rounded-3xl p-6 flex flex-col justify-between"
+            >
+              <h2 className="text-xl font-black mb-4">
+                {item.subject}
+              </h2>
+
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-indigo-600 text-white text-center py-3 rounded-xl font-black"
+              >
+                Acessar
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* =========================
+     TELA DE LOGIN
+  ========================== */
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -122,6 +178,9 @@ const App: React.FC = () => {
     );
   }
 
+  /* =========================
+     PAINEL DO PROFESSOR
+  ========================== */
   return (
     <div className="min-h-screen bg-slate-50 flex">
       <aside className="w-72 bg-white border-r p-6">
@@ -133,7 +192,6 @@ const App: React.FC = () => {
       <main className="flex-1 p-10 space-y-10">
         <h1 className="text-4xl font-black">Painel do Professor</h1>
 
-        {/* CADASTRO DE ALUNO */}
         <div className="bg-white p-8 rounded-3xl border space-y-4 max-w-xl">
           <h3 className="font-black flex items-center gap-2">
             <UserPlus /> Novo Aluno
@@ -155,7 +213,6 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        {/* ATRIBUIÇÃO DE MATÉRIA */}
         <div className="bg-white p-8 rounded-3xl border space-y-4 max-w-xl">
           <h3 className="font-black flex items-center gap-2">
             <BookOpen /> Atribuir Matéria
@@ -199,3 +256,5 @@ const App: React.FC = () => {
 };
 
 export default App;
+ 
+ 
