@@ -37,7 +37,7 @@ const App: React.FC = () => {
         }));
   });
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<Student | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ name: '', pass: '' });
@@ -56,6 +56,9 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
   }, [students]);
 
+  /* =======================
+     LOGIN / LOGOUT
+  ======================= */
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -71,7 +74,7 @@ const App: React.FC = () => {
     );
 
     if (aluno) {
-      setUser(JSON.parse(JSON.stringify(aluno)));
+      setUser(aluno);
       setIsAdmin(false);
       setError('');
       return;
@@ -80,6 +83,16 @@ const App: React.FC = () => {
     setError('Usuário ou senha inválidos');
   };
 
+  const handleLogout = () => {
+    setIsAdmin(false);
+    setUser(null);
+    setLoginForm({ name: '', pass: '' });
+    setError('');
+  };
+
+  /* =======================
+     PROFESSOR
+  ======================= */
   const handleAddStudent = () => {
     if (!newStudent.name || !newStudent.password) return;
 
@@ -152,7 +165,12 @@ const App: React.FC = () => {
     setExerciseTitle('');
   };
 
+  /* =======================
+     ALUNO
+  ======================= */
   const completeExercise = (subject: string, exerciseId: string) => {
+    if (!user) return;
+
     setStudents(prev =>
       prev.map(s => {
         if (s.id !== user.id) return s;
@@ -169,6 +187,21 @@ const App: React.FC = () => {
         };
       })
     );
+
+    setUser(prev =>
+      prev
+        ? {
+            ...prev,
+            xp: prev.xp + 10,
+            exercises: {
+              ...prev.exercises,
+              [subject]: prev.exercises![subject].map(ex =>
+                ex.id === exerciseId ? { ...ex, done: true } : ex
+              )
+            }
+          }
+        : prev
+    );
   };
 
   /* =======================
@@ -177,17 +210,28 @@ const App: React.FC = () => {
   if (user && !isAdmin) {
     return (
       <div className="min-h-screen bg-slate-50 p-10">
-        <h1 className="text-3xl font-black mb-6">
-          {user.name} — XP: {user.xp}
-        </h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-black">
+            {user.name} — XP: {user.xp}
+          </h1>
 
-        {user.assignedSubjects?.map((sub: any) => (
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold"
+          >
+            Sair
+          </button>
+        </div>
+
+        {user.assignedSubjects?.map(sub => (
           <div key={sub.subject} className="bg-white p-6 rounded-3xl border mb-6">
             <h2 className="text-xl font-black mb-4">{sub.subject}</h2>
 
-            {(user.exercises?.[sub.subject] || []).map((ex: Exercise) => (
+            {(user.exercises?.[sub.subject] || []).map(ex => (
               <div key={ex.id} className="flex justify-between items-center mb-2">
-                <span>{ex.title} ({ex.points} pts)</span>
+                <span>
+                  {ex.title} ({ex.points} pts)
+                </span>
 
                 {!ex.done && (
                   <button
@@ -240,7 +284,16 @@ const App: React.FC = () => {
   ======================= */
   return (
     <div className="min-h-screen bg-slate-50 p-10 space-y-10">
-      <h1 className="text-4xl font-black">Painel do Professor</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-4xl font-black">Painel do Professor</h1>
+
+        <button
+          onClick={handleLogout}
+          className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold"
+        >
+          Sair
+        </button>
+      </div>
 
       <div className="bg-white p-6 rounded-3xl border max-w-xl">
         <h3 className="font-black mb-2">Novo Aluno</h3>
@@ -256,7 +309,10 @@ const App: React.FC = () => {
           onChange={e => setNewStudent({ ...newStudent, password: e.target.value })}
           className="border p-2 rounded-xl w-full mb-2"
         />
-        <button onClick={handleAddStudent} className="bg-indigo-600 text-white py-2 rounded-xl w-full">
+        <button
+          onClick={handleAddStudent}
+          className="bg-indigo-600 text-white py-2 rounded-xl w-full"
+        >
           Cadastrar
         </button>
       </div>
@@ -271,7 +327,9 @@ const App: React.FC = () => {
         >
           <option value="">Aluno</option>
           {students.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
           ))}
         </select>
 
@@ -281,7 +339,9 @@ const App: React.FC = () => {
           className="border p-2 rounded-xl w-full"
         >
           {Object.values(Subject).map(sub => (
-            <option key={sub} value={sub}>{sub}</option>
+            <option key={sub} value={sub}>
+              {sub}
+            </option>
           ))}
         </select>
 
@@ -299,7 +359,10 @@ const App: React.FC = () => {
           className="border p-2 rounded-xl w-full"
         />
 
-        <button onClick={addExercise} className="bg-slate-900 text-white py-2 rounded-xl w-full">
+        <button
+          onClick={addExercise}
+          className="bg-slate-900 text-white py-2 rounded-xl w-full"
+        >
           Adicionar
         </button>
       </div>
